@@ -386,16 +386,54 @@ function showScreen(id) {
    AUDIO
    ============================================================ */
 const Aud = {
-  tracks:[], idx:0, el:null,
-  async init(){ try{ const r=await fetch('/api/music-list'); const d=await r.json(); this.tracks=d.files||[]; }catch(e){} },
-  play(){
-    if(!this.tracks.length) return;
-    if(this.el) this.el.pause();
-    this.el = new Audio('/music/'+this.tracks[this.idx]);
+  tracks: [],      // semua track
+  menuTrack: null, // 'menu.mp3' kalau ada
+  gameTracks: [],  // semua selain menu.mp3
+  idx: 0,
+  el: null,
+
+  async init(){
+    try {
+      const r = await fetch('/api/music-list');
+      const d = await r.json();
+      this.tracks = d.files || [];
+      // Pisahkan menu.mp3 dari game tracks
+      this.menuTrack = this.tracks.find(f => f.toLowerCase() === 'menu.mp3') || null;
+      this.gameTracks = this.tracks.filter(f => f.toLowerCase() !== 'menu.mp3');
+      // Kalau ga ada game tracks, pakai semua track termasuk menu
+      if(!this.gameTracks.length) this.gameTracks = [...this.tracks];
+    } catch(e) {}
+  },
+
+  _play(file, loop){
+    if(!file) return;
+    if(this.el){ this.el.pause(); this.el.onended = null; }
+    this.el = new Audio('/music/' + file);
     this.el.volume = 0.3;
+    this.el.loop = loop || false;
     this.el.play().catch(()=>{});
-    this.el.onended = ()=>{ this.idx=(this.idx+1)%this.tracks.length; this.play(); };
-  }
+    if(!loop){
+      this.el.onended = () => {
+        this.idx = (this.idx + 1) % this.gameTracks.length;
+        this._play(this.gameTracks[this.idx], false);
+      };
+    }
+  },
+
+  playMenu(){
+    if(!this.tracks.length) return;
+    // Kalau ada menu.mp3 pakai itu, kalau ga pakai track pertama
+    const track = this.menuTrack || this.tracks[0];
+    this._play(track, true); // loop menu music
+  },
+
+  playGame(){
+    if(!this.gameTracks.length) return;
+    this.idx = 0;
+    this._play(this.gameTracks[0], false);
+  },
+
+  stop(){ if(this.el){ this.el.pause(); this.el.onended = null; } }
 };
 Aud.init();
 
@@ -403,27 +441,40 @@ Aud.init();
    PHOTO BACKGROUNDS
    ============================================================ */
 const Photos = {
-  imgs: [], loaded: false, idx: 0,
+  imgs: [], loaded: false,
+
   async init(){
     try {
       const r = await fetch('/api/photo-list');
       const d = await r.json();
-      if(!d.files||!d.files.length){ this.loaded=false; return; }
-      let count=0;
-      d.files.forEach(f=>{
-        const img=new Image();
-        img.onload=()=>{ this.imgs.push(img); count++; if(count===d.files.length) this.loaded=true; };
-        img.onerror=()=>{ count++; if(count===d.files.length&&this.imgs.length) this.loaded=true; };
-        img.src='/photos/'+f;
+      const files = d.files || [];
+      if(!files.length) return;
+
+      let done = 0;
+      const total = files.length;
+      const tempImgs = new Array(total);
+
+      files.forEach((f, i) => {
+        const img = new Image();
+        img.onload = () => {
+          tempImgs[i] = img;
+          done++;
+          if(done === total){
+            // filter out failed ones, keep order
+            this.imgs = tempImgs.filter(Boolean);
+            if(this.imgs.length) this.loaded = true;
+          }
+        };
+        img.onerror = () => {
+          done++;
+          if(done === total){
+            this.imgs = tempImgs.filter(Boolean);
+            if(this.imgs.length) this.loaded = true;
+          }
+        };
+        img.src = '/photos/' + f;
       });
-    } catch(e){ this.loaded=false; }
-  },
-  // Get current bg image (cycle every 30s worth of scroll)
-  get(scrollX){
-    if(!this.loaded||!this.imgs.length) return null;
-    // cycle image every full scroll width
-    const idx = Math.floor(scrollX/(GW)) % this.imgs.length;
-    return this.imgs[idx];
+    } catch(e){ console.warn('Photo load error:', e); }
   }
 };
 Photos.init();
@@ -447,7 +498,7 @@ Photos.init();
   function done(){
     document.getElementById('s-intro').style.transition='opacity 0.4s';
     document.getElementById('s-intro').style.opacity='0';
-    setTimeout(()=>{ showScreen('menu'); Aud.play(); startMenuAnim(); }, 400);
+    setTimeout(()=>{ showScreen('menu'); startMenuAnim(); }, 400);
   }
 })();
 
@@ -465,6 +516,7 @@ function startMenuAnim(){
 
 document.getElementById('btn-play').addEventListener('click',()=>{
   clearTimeout(menuTimer);
+  Aud.playGame(); // start game music on click (user interaction = no autoplay block)
   document.getElementById('s-menu').classList.remove('active');
   setTimeout(startGame, 300);
 });
@@ -602,23 +654,19 @@ function render(){
 
   // sky / photo background
   if(Photos.loaded && Photos.imgs.length){
-    // draw scrolling photo as background (covers sky area)
     const nImgs = Photos.imgs.length;
-    // We show 2 consecutive images to handle the seam
-    const totalW = GW * nImgs; // virtual total width before loop
-    const scrollPos = G.totalScroll * 0.25; // slow parallax
-    const loopPos = scrollPos % totalW;
+    const scrollPos = (G.totalScroll * 0.2) % (GW * nImgs);
 
-    for(let i=0;i<nImgs+1;i++){
-      const img = Photos.imgs[i % nImgs];
-      const imgX = i * GW - loopPos;
-      if(imgX > GW || imgX + GW < 0) continue;
-      // draw covering only sky portion (above ground)
-      gx.drawImage(img, imgX, 0, GW, GND);
+    // Draw enough copies to cover the canvas width seamlessly
+    for(let i = -1; i <= nImgs; i++){
+      const imgX = i * GW - scrollPos;
+      if(imgX + GW <= 0 || imgX >= GW) continue;
+      const imgIdx = ((i % nImgs) + nImgs) % nImgs;
+      gx.drawImage(Photos.imgs[imgIdx], imgX, 0, GW, GND);
     }
-    // dark overlay so pixel art stands out
-    gx.fillStyle='rgba(5,5,20,0.45)';
-    gx.fillRect(0,0,GW,GND);
+    // dark overlay so sprites stay readable
+    gx.fillStyle = 'rgba(0,0,10,0.42)';
+    gx.fillRect(0, 0, GW, GND);
   } else {
     // fallback gradient sky
     const sk=gx.createLinearGradient(0,0,0,GH);
@@ -717,14 +765,15 @@ function drawBuildings(offX){
 
 /* ── BUTTONS ── */
 document.getElementById('btn-retry').addEventListener('click',()=>{
-  showScreen('game');  // hides gameover too
+  showScreen('game');
+  Aud.playGame();
   startGame();
 });
 document.getElementById('btn-tomenu').addEventListener('click',()=>{
-  showScreen('menu');  // hides gameover too
+  showScreen('menu');
   if(raf) cancelAnimationFrame(raf);
   btnJ.disabled=false;
-  Aud.play();
+  Aud.playMenu();
   startMenuAnim();
 });
 </script>
