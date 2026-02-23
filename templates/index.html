@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stay Run!</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: #050510;
+  font-family: 'Press Start 2P', monospace;
+  color: #fff;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  cursor: crosshair;
+}
+
+/* ── SCREENS ── */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+.screen.active { opacity: 1; pointer-events: all; }
+
+/* ── INTRO ── */
+#s-intro { background: #000; z-index: 100; }
+
+.intro-title {
+  font-size: clamp(24px, 5vw, 64px);
+  color: #00ffcc;
+  text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc;
+  letter-spacing: 8px;
+  margin-bottom: 16px;
+  transform: scale(0.5);
+  opacity: 0;
+  transition: transform 0.8s cubic-bezier(.23,1,.32,1), opacity 0.8s;
+}
+.intro-title.pop { transform: scale(1); opacity: 1; }
+
+.intro-sub {
+  font-size: clamp(8px, 1.5vw, 14px);
+  color: #ffe600;
+  letter-spacing: 6px;
+  opacity: 0;
+  transition: opacity 0.6s 0.4s;
+  margin-bottom: 48px;
+}
+.intro-sub.pop { opacity: 0.8; }
+
+.load-bar-outer {
+  width: min(320px, 70vw);
+  height: 14px;
+  border: 2px solid #00ffcc;
+  box-shadow: 0 0 8px #00ffcc;
+  background: #000;
+  opacity: 0;
+  transition: opacity 0.5s 0.8s;
+}
+.load-bar-outer.pop { opacity: 1; }
+.load-bar-inner {
+  height: 100%;
+  width: 0%;
+  background: #00ffcc;
+  box-shadow: 0 0 10px #00ffcc;
+  transition: width 0.1s linear;
+}
+.load-label {
+  font-size: 7px;
+  color: #00ffcc;
+  margin-top: 10px;
+  letter-spacing: 2px;
+  opacity: 0;
+  transition: opacity 0.5s 1s;
+  min-height: 14px;
+}
+.load-label.pop { opacity: 1; }
+
+/* ── MENU ── */
+#s-menu {
+  background: linear-gradient(160deg, #06061a 0%, #10103a 100%);
+  z-index: 50;
+  flex-direction: row;
+  gap: 0;
+  justify-content: space-evenly;
+}
+
+.menu-left {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 380px;
+}
+.menu-title {
+  font-size: clamp(28px, 5vw, 60px);
+  line-height: 1.3;
+  color: #00ffcc;
+  text-shadow: 4px 4px 0 #ff004c, 0 0 30px #00ffcc;
+}
+.menu-tag {
+  font-size: clamp(7px, 1.3vw, 11px);
+  color: #ffe600;
+  letter-spacing: 3px;
+  opacity: 0.8;
+}
+.menu-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#menu-sprite { image-rendering: pixelated; }
+
+.btn {
+  font-family: 'Press Start 2P', monospace;
+  background: transparent;
+  border: 3px solid #00ffcc;
+  color: #00ffcc;
+  padding: 14px 32px;
+  font-size: clamp(9px, 1.5vw, 13px);
+  letter-spacing: 2px;
+  cursor: pointer;
+  text-shadow: 0 0 8px #00ffcc;
+  box-shadow: 0 0 12px #00ffcc55, inset 0 0 12px #00ffcc11;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.btn:hover {
+  background: #00ffcc;
+  color: #000;
+  text-shadow: none;
+  box-shadow: 0 0 24px #00ffcc;
+}
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; background: transparent !important; color: #00ffcc !important; text-shadow: none !important; }
+.btn-yellow {
+  border-color: #ffe600;
+  color: #ffe600;
+  text-shadow: 0 0 8px #ffe600;
+  box-shadow: 0 0 12px #ffe60055, inset 0 0 12px #ffe60011;
+}
+.btn-yellow:hover { background: #ffe600; color: #000; }
+.btn-red {
+  border-color: #ff004c;
+  color: #ff004c;
+  text-shadow: 0 0 8px #ff004c;
+  box-shadow: 0 0 12px #ff004c55;
+}
+.btn-red:hover { background: #ff004c; color: #fff; }
+
+/* ── GAME ── */
+#s-game {
+  background: #050510;
+  z-index: 20;
+  gap: 8px;
+}
+
+#hud {
+  display: flex;
+  gap: 32px;
+  font-size: clamp(7px, 1.3vw, 10px);
+  color: #ffe600;
+  text-shadow: 0 0 6px #ffe600;
+  letter-spacing: 1px;
+}
+
+#game-canvas {
+  image-rendering: pixelated;
+  border: 3px solid #00ffcc;
+  box-shadow: 0 0 20px #00ffcc88, 0 0 60px #00ffcc22;
+  display: block;
+}
+
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+.key-tip {
+  font-size: 7px;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 1px;
+}
+
+/* ── GAMEOVER ── */
+#s-gameover {
+  background: rgba(0,0,0,0.88);
+  z-index: 80;
+  gap: 20px;
+}
+.go-title {
+  font-size: clamp(20px, 4.5vw, 52px);
+  color: #ff004c;
+  text-shadow: 0 0 20px #ff004c, 4px 4px 0 #800;
+  animation: flicker 1s infinite;
+}
+@keyframes flicker {
+  0%,90%,100% { opacity:1 }
+  92%,98%     { opacity:0.4 }
+}
+.go-score {
+  font-size: clamp(11px, 2vw, 20px);
+  color: #ffe600;
+  text-shadow: 0 0 10px #ffe600;
+}
+.go-btns { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; margin-top:8px; }
+
+/* scanlines overlay */
+body::after {
+  content:'';
+  position:fixed;
+  inset:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px);
+  pointer-events:none;
+  z-index:999;
+}
+
+#flash { position:fixed; inset:0; background:#00ffcc; opacity:0; pointer-events:none; z-index:200; transition:opacity 0.15s; }
+</style>
+</head>
+<body>
+
+<div id="flash"></div>
+
+<!-- INTRO -->
+<div class="screen active" id="s-intro">
+  <div class="intro-title" id="ititle">STAY RUN!</div>
+  <div class="intro-sub" id="isub">— SURVIVE OR BE DEVOURED —</div>
+  <div class="load-bar-outer" id="lbar-out">
+    <div class="load-bar-inner" id="lbar"></div>
+  </div>
+  <div class="load-label" id="llabel">INITIALIZING...</div>
+</div>
+
+<!-- MENU -->
+<div class="screen" id="s-menu">
+  <div class="menu-left">
+    <div class="menu-title">STAY<br>RUN!</div>
+    <div class="menu-tag">DON'T STOP. DON'T LOOK BACK.</div>
+    <button class="btn" id="btn-play">&#9654; PLAY NOW</button>
+  </div>
+  <div class="menu-right">
+    <canvas id="menu-sprite" width="96" height="112" style="transform:scale(2.5); transform-origin:center;"></canvas>
+  </div>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="s-game">
+  <div id="hud">
+    <span>SCORE: <b id="h-score">0</b></span>
+    <span>BEST: <b id="h-best">0</b></span>
+    <span>SPEED: <b id="h-speed">1.0</b>x</span>
+  </div>
+  <canvas id="game-canvas"></canvas>
+  <div id="controls">
+    <button class="btn btn-yellow" id="btn-jump">&#11014; JUMP</button>
+    <span class="key-tip">SPACE / UP ARROW</span>
+  </div>
+</div>
+
+<!-- GAMEOVER -->
+<div class="screen" id="s-gameover">
+  <div class="go-title">GAME OVER</div>
+  <div class="go-score">SCORE: <span id="go-score">0</span> &nbsp;|&nbsp; BEST: <span id="go-best">0</span></div>
+  <div class="go-btns">
+    <button class="btn btn-yellow" id="btn-retry">&#8635; RETRY</button>
+    <button class="btn btn-red" id="btn-tomenu">&#8962; MENU</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   SPRITE DEFINITIONS  (rows x cols of color strings or null)
+   ============================================================ */
+const _ = null;
+
+// Player run A (12 cols x 14 rows)
+const PA = [
+  [_,_,_,'#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88',_,_,_,_],
+  [_,_,'#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88',_,_,_],
+  [_,_,'#333','#ffcc88','#0cf','#ffcc88','#0cf','#ffcc88','#333',_,_,_],
+  [_,_,'#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88',_,_,_],
+  [_,'#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_,_],
+  ['#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_],
+  ['#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_],
+  [_,'#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_,_],
+  [_,_,'#0af','#0af','#ff4','#0af','#ff4','#0af','#0af',_,_,_],
+  [_,'#333','#0af','#0af','#ff4','#0af','#ff4','#0af','#0af','#333',_,_],
+  [_,'#333','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#333',_,_],
+  [_,'#333','#333',_,_,_,_,_,'#333','#333',_,_],
+  [_,'#555','#555',_,_,_,_,_,'#555','#555',_,_],
+  [_,'#555',_,_,_,_,_,_,_,'#555',_,_],
+];
+
+// Player run B
+const PB = [
+  [_,_,_,'#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88',_,_,_,_],
+  [_,_,'#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88',_,_,_],
+  [_,_,'#333','#ffcc88','#0cf','#ffcc88','#0cf','#ffcc88','#333',_,_,_],
+  [_,_,'#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88',_,_,_],
+  [_,'#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_,_],
+  ['#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_],
+  ['#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_],
+  [_,'#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_,_],
+  [_,_,'#0af','#ff4','#0af','#0af','#0af','#ff4','#0af',_,_,_],
+  [_,'#333','#0af','#ff4','#0af','#0af','#0af','#ff4','#0af','#333',_,_],
+  [_,'#333','#333','#0af','#0af','#0af','#0af','#333','#333',_,_,_],
+  [_,_,'#555','#333',_,_,'#333','#555',_,_,_,_],
+  ['#555',_,'#666',_,_,_,'#666',_,_,_,_,_],
+  ['#666',_,_,_,_,_,_,_,_,_,_,_],
+];
+
+// Dead player (10 cols x 8 rows)
+const PD = [
+  [_,_,'#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88',_,_],
+  [_,'#ffcc88','#333','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#333','#ffcc88',_],
+  [_,'#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88','#ffcc88',_],
+  [_,'#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_],
+  ['#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af'],
+  [_,'#0af','#0af','#0af','#0af','#0af','#0af','#0af','#0af',_],
+  [_,_,'#333','#333',_,_,'#333','#333',_,_],
+  [_,'#333',_,'#333',_,_,'#333',_,'#333',_],
+];
+
+// Enemy A (12 cols x 11 rows)
+const EA = [
+  [_,_,'#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c',_,_],
+  [_,'#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c',_],
+  ['#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c'],
+  ['#ff004c','#fff','#ff004c','#ff004c','#f00','#f00','#f00','#f00','#ff004c','#ff004c','#fff','#ff004c'],
+  ['#ff004c','#fff','#f00','#ff004c','#f00','#900','#900','#f00','#ff004c','#f00','#fff','#ff004c'],
+  ['#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c'],
+  [_,'#ff004c','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff004c',_],
+  [_,'#c00','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#c00',_],
+  ['#900',_,'#900','#ff004c',_,_,_,_,'#ff004c','#900',_,'#900'],
+  ['#900',_,'#900',_,_,_,_,_,_,'#900',_,'#900'],
+  ['#700',_,'#700',_,_,_,_,_,_,'#700',_,'#700'],
+];
+
+// Enemy B
+const EB = [
+  [_,_,'#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c',_,_],
+  [_,'#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c',_],
+  ['#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c'],
+  ['#ff004c','#fff','#ff004c','#ff004c','#f00','#f00','#f00','#f00','#ff004c','#ff004c','#fff','#ff004c'],
+  ['#ff004c','#fff','#f00','#ff004c','#f00','#900','#900','#f00','#ff004c','#f00','#fff','#ff004c'],
+  ['#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c'],
+  [_,'#ff004c','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff8c69','#ff004c',_],
+  [_,'#c00','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#ff004c','#c00',_],
+  ['#900','#900',_,'#ff004c',_,_,_,_,'#ff004c',_,'#900','#900'],
+  [_,'#900',_,_,_,_,_,_,_,_,'#900',_],
+  [_,'#700',_,_,_,_,_,_,_,_,'#700',_],
+];
+
+/* draw sprite on canvas context */
+function spr(ctx, grid, ox, oy, sc, flipH) {
+  const rows = grid.length, cols = grid[0].length;
+  if(flipH) {
+    ctx.save();
+    ctx.translate(ox + cols*sc, oy);
+    ctx.scale(-1,1);
+    grid.forEach((row,ry)=>row.forEach((c,rx)=>{ if(c){ctx.fillStyle=c;ctx.fillRect(rx*sc,ry*sc,sc,sc);} }));
+    ctx.restore();
+  } else {
+    grid.forEach((row,ry)=>row.forEach((c,rx)=>{ if(c){ctx.fillStyle=c;ctx.fillRect(ox+rx*sc,oy+ry*sc,sc,sc);} }));
+  }
+}
+
+/* ============================================================
+   SCREEN MANAGER
+   ============================================================ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('s-'+id).classList.add('active');
+}
+
+/* ============================================================
+   AUDIO  — file list diinject langsung dari Flask (works di Vercel)
+   ============================================================ */
+const Aud = (() => {
+  const allTracks  = {{ music_files | safe }};  // e.g. ["menu.mp3","bgm1.mp3"]
+  const menuTrack  = allTracks.find(f => f.toLowerCase() === 'menu.mp3') || allTracks[0] || null;
+  const gameTracks = allTracks.filter(f => f.toLowerCase() !== 'menu.mp3');
+  const GT         = gameTracks.length ? gameTracks : allTracks; // fallback
+
+  let el  = null;
+  let idx = 0;
+
+  function _play(file, loop){
+    if(!file) return;
+    if(el){ el.pause(); el.onended = null; }
+    el = new Audio('/static/music/' + file);
+    el.volume = 0.32;
+    el.loop   = !!loop;
+    el.play().catch(()=>{});
+    if(!loop){
+      el.onended = () => { idx = (idx + 1) % GT.length; _play(GT[idx], false); };
+    }
+  }
+
+  return {
+    playMenu(){ _play(menuTrack, true); },
+    playGame(){ idx = 0; _play(GT[0], false); },
+    stop(){ if(el){ el.pause(); el.onended = null; } }
+  };
+})();
+
+/* ============================================================
+   PHOTO BACKGROUNDS — file list diinject dari Flask (works di Vercel)
+   ============================================================ */
+const Photos = (() => {
+  const files = {{ photo_files | safe }};  // e.g. ["city.jpg","forest.jpg"]
+  const imgs  = [];
+  let loaded  = false;
+
+  if(files.length){
+    let done = 0;
+    const tmp = new Array(files.length);
+    files.forEach((f, i) => {
+      const img = new Image();
+      img.onload = img.onerror = function(){
+        if(img.naturalWidth) tmp[i] = img;
+        if(++done === files.length){
+          imgs.push(...tmp.filter(Boolean));
+          if(imgs.length) loaded = true;
+        }
+      };
+      img.src = '/static/photos/' + f;
+    });
+  }
+
+  return { get imgs(){ return imgs; }, get loaded(){ return loaded; } };
+})();
+
+/* ============================================================
+   INTRO
+   ============================================================ */
+(function(){
+  const msgs = ['LOADING ASSETS...','SPAWNING MONSTERS...','BUILDING WORLD...','ALMOST READY...','LETS GO!'];
+  let pct=0, mi=0;
+  setTimeout(()=>{ document.getElementById('ititle').classList.add('pop'); document.getElementById('isub').classList.add('pop'); }, 200);
+  setTimeout(()=>{ document.getElementById('lbar-out').classList.add('pop'); document.getElementById('llabel').classList.add('pop'); tick(); }, 900);
+
+  function tick(){
+    if(pct>=100){ document.getElementById('llabel').textContent='READY!'; setTimeout(done,500); return; }
+    pct=Math.min(100,pct+Math.random()*14+4);
+    document.getElementById('lbar').style.width=pct+'%';
+    if(mi<msgs.length&&pct>mi*22) document.getElementById('llabel').textContent=msgs[mi++];
+    setTimeout(tick, Math.random()*110+30);
+  }
+  function done(){
+    document.getElementById('s-intro').style.transition='opacity 0.4s';
+    document.getElementById('s-intro').style.opacity='0';
+    setTimeout(()=>{ showScreen('menu'); startMenuAnim(); }, 400);
+  }
+})();
+
+/* ============================================================
+   MENU ANIMATION
+   ============================================================ */
+let menuTimer=null;
+function startMenuAnim(){
+  const c=document.getElementById('menu-sprite');
+  const ctx=c.getContext('2d');
+  let f=0,t=0;
+  function step(){ ctx.clearRect(0,0,c.width,c.height); ctx.save(); ctx.shadowColor='#00ffcc'; ctx.shadowBlur=16; spr(ctx,f%2===0?PA:PB,10,10,4); ctx.restore(); t++; if(t%10===0)f++; menuTimer=setTimeout(step,80); }
+  step();
+}
+
+document.getElementById('btn-play').addEventListener('click',()=>{
+  clearTimeout(menuTimer);
+  Aud.playGame(); // start game music on click (user interaction = no autoplay block)
+  document.getElementById('s-menu').classList.remove('active');
+  setTimeout(startGame, 300);
+});
+
+/* ============================================================
+   GAME
+   ============================================================ */
+const gc = document.getElementById('game-canvas');
+const gx = gc.getContext('2d');
+
+const GW = Math.min(window.innerWidth*0.9, 820)|0;
+const GH = Math.min(window.innerHeight*0.38, 260)|0;
+gc.width=GW; gc.height=GH;
+
+const GND    = GH-52;
+const SC     = 3;
+const PW     = 12*SC;
+const PH     = 14*SC;
+const EW     = 12*SC;
+const EH     = 11*SC;
+const PX     = (GW*0.2)|0;
+
+let G=null, raf=null, lastTs=0;
+const btnJ = document.getElementById('btn-jump');
+
+function newGame(){
+  return {
+    score:0, best:+(localStorage.getItem('sr_best')||0),
+    py: GND-PH, vy:0, grounded:true,
+    frame:0, ftick:0,
+    dead:false, dtick:0, dflash:0,
+    ex:-EW*3, ef:0, etick:0,
+    obs:[], otick:0,
+    bgx:0, gnx:0, totalScroll:0,
+    spd:3.2,
+    pops:[],
+  };
+}
+
+function tryJump(){
+  if(!G||G.dead||!G.grounded) return;
+  G.grounded=false; G.vy=-13.5;
+  btnJ.disabled=true;
+}
+btnJ.addEventListener('click',tryJump);
+document.addEventListener('keydown',e=>{ if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();tryJump();} });
+
+function startGame(){
+  const fl=document.getElementById('flash');
+  fl.style.opacity='1'; setTimeout(()=>fl.style.opacity='0',150);
+  showScreen('game');
+  G=newGame();
+  document.getElementById('h-score').textContent='0';
+  document.getElementById('h-best').textContent=G.best;
+  document.getElementById('h-speed').textContent='1.0';
+  btnJ.disabled=false;
+  lastTs=performance.now();
+  if(raf) cancelAnimationFrame(raf);
+  raf=requestAnimationFrame(loop);
+}
+
+function loop(ts){
+  const dt=Math.min((ts-lastTs)/16.67,2.5); lastTs=ts;
+  G.dead ? updateDead(dt) : update(dt);
+  render();
+  raf=requestAnimationFrame(loop);
+}
+
+function update(dt){
+  const mult = 1+G.score*0.018;
+  const spd  = G.spd * mult * dt;
+
+  G.bgx=(G.bgx+spd*0.3)%(GW);
+  G.gnx=(G.gnx+spd)%40;
+  G.totalScroll+=spd;
+
+  // enemy wanders behind player
+  G.ex -= spd*0.55;
+  if(G.ex < -EW*3) G.ex=-EW*1.5;
+
+  // gravity
+  if(!G.grounded){
+    G.vy+=0.75*dt; G.py+=G.vy*dt;
+    if(G.py>=GND-PH){ G.py=GND-PH; G.vy=0; G.grounded=true; if(!G.dead) btnJ.disabled=false; }
+  }
+
+  // obstacles
+  G.otick+=dt;
+  const ival=Math.max(50,140-G.score*2.5);
+  if(G.otick>=ival){ G.otick=0; const h=(Math.floor(Math.random()*2)+1)*14; G.obs.push({x:GW+8,w:16,h,done:false}); }
+
+  G.obs.forEach(o=>{
+    o.x-=spd;
+    if(!o.done&&o.x+o.w<PX){
+      o.done=true; G.score++;
+      if(G.score>G.best){ G.best=G.score; localStorage.setItem('sr_best',G.best); }
+      document.getElementById('h-score').textContent=G.score;
+      document.getElementById('h-best').textContent=G.best;
+      document.getElementById('h-speed').textContent=mult.toFixed(1);
+      G.pops.push({x:PX+PW,y:G.py,t:35});
+    }
+  });
+  G.obs=G.obs.filter(o=>o.x>-30);
+
+  // collision (inner hitbox)
+  const px1=PX+PW*0.25, px2=PX+PW*0.75, py1=G.py+PH*0.2, py2=G.py+PH;
+  for(const o of G.obs){
+    const oy=GND-o.h;
+    if(px1<o.x+o.w && px2>o.x && py1<GND && py2>oy){
+      G.dead=true; G.ex=-EW*2; btnJ.disabled=true; return;
+    }
+  }
+
+  // animation ticks
+  G.ftick+=dt; if(G.ftick>=7){G.ftick=0;G.frame++;}
+  G.etick+=dt; if(G.etick>=8){G.etick=0;G.ef++;}
+}
+
+function updateDead(dt){
+  G.dtick+=dt; G.dflash+=dt;
+  if(G.ex<PX-EW*1.2) G.ex+=6*dt;
+  G.etick+=dt; if(G.etick>=8){G.etick=0;G.ef++;}
+  if(G.dtick>100){ cancelAnimationFrame(raf); gameOver(); }
+}
+
+function gameOver(){
+  document.getElementById('go-score').textContent=G.score;
+  document.getElementById('go-best').textContent=G.best;
+  showScreen('gameover');
+}
+
+/* ── RENDER ── */
+function render(){
+  gx.clearRect(0,0,GW,GH);
+
+  // sky / photo background
+  if(Photos.loaded && Photos.imgs.length){
+    const nImgs = Photos.imgs.length;
+    const scrollPos = (G.totalScroll * 0.2) % (GW * nImgs);
+
+    // Draw enough copies to cover the canvas width seamlessly
+    for(let i = -1; i <= nImgs; i++){
+      const imgX = i * GW - scrollPos;
+      if(imgX + GW <= 0 || imgX >= GW) continue;
+      const imgIdx = ((i % nImgs) + nImgs) % nImgs;
+      gx.drawImage(Photos.imgs[imgIdx], imgX, 0, GW, GND);
+    }
+    // dark overlay so sprites stay readable
+    gx.fillStyle = 'rgba(0,0,10,0.42)';
+    gx.fillRect(0, 0, GW, GND);
+  } else {
+    // fallback gradient sky
+    const sk=gx.createLinearGradient(0,0,0,GH);
+    sk.addColorStop(0,'#030318'); sk.addColorStop(1,'#0c0c28');
+    gx.fillStyle=sk; gx.fillRect(0,0,GW,GH);
+    // stars
+    gx.fillStyle='rgba(255,255,255,0.65)';
+    for(let i=0;i<28;i++){
+      const sx=((i*79+G.bgx*0.08)%GW+GW)%GW;
+      const sy=(i*41)%(GND-10);
+      gx.fillRect(sx,sy,i%4===0?2:1,i%4===0?2:1);
+    }
+    // buildings
+    drawBuildings(G.bgx);
+    drawBuildings((G.bgx+GW*0.5)%GW-GW*0.5);
+  }
+
+  // ground base
+  gx.fillStyle='#111122'; gx.fillRect(0,GND,GW,GH-GND);
+  gx.shadowColor='#00ffcc'; gx.shadowBlur=8;
+  gx.fillStyle='#00ffcc'; gx.fillRect(0,GND,GW,2);
+  gx.shadowBlur=0;
+  // tiles
+  for(let tx=-(G.gnx);tx<GW;tx+=40){
+    gx.fillStyle='#1a1a3a'; gx.fillRect(tx+1,GND+3,38,10);
+    gx.fillStyle='#0a0a20'; gx.fillRect(tx+2,GND+4,36,8);
+  }
+  // lane dashes
+  for(let dx=(-(G.gnx*2)%60+60)%60-60;dx<GW;dx+=60){
+    gx.fillStyle='rgba(0,255,204,0.18)'; gx.fillRect(dx,GND+18,32,3);
+  }
+
+  // obstacles
+  G.obs.forEach(o=>{
+    const oy=GND-o.h;
+    gx.shadowColor='#ff4400'; gx.shadowBlur=10;
+    gx.fillStyle='#aa1100'; gx.fillRect(o.x,oy,o.w,o.h);
+    gx.fillStyle='#ff3300'; gx.fillRect(o.x+2,oy+1,o.w-4,3);
+    gx.shadowBlur=0;
+    for(let sx=o.x;sx<o.x+o.w-3;sx+=7){
+      gx.fillStyle='#ff5500';
+      gx.beginPath(); gx.moveTo(sx,oy); gx.lineTo(sx+3.5,oy-8); gx.lineTo(sx+7,oy); gx.fill();
+    }
+  });
+
+  // enemy (mirrored)
+  gx.shadowColor='#ff004c'; gx.shadowBlur=14;
+  spr(gx, G.ef%2===0?EA:EB, G.ex, GND-EH, SC, true);
+  gx.shadowBlur=0;
+
+  // player
+  if(G.dead){
+    if(Math.floor(G.dflash/4)%2===0){
+      gx.shadowColor='#ff004c'; gx.shadowBlur=12;
+      spr(gx, PD, PX, G.py+PH-8*SC, SC);
+      gx.shadowBlur=0;
+    }
+  } else {
+    gx.shadowColor='#00ffcc'; gx.shadowBlur=10;
+    spr(gx, G.frame%2===0?PA:PB, PX, G.py, SC);
+    gx.shadowBlur=0;
+  }
+
+  // score pops
+  G.pops=G.pops.filter(p=>{
+    p.t--;
+    gx.font='8px "Press Start 2P"';
+    gx.fillStyle=`rgba(255,230,0,${p.t/35})`;
+    gx.fillText('+1',p.x,p.y-(35-p.t)*0.5);
+    return p.t>0;
+  });
+}
+
+function drawBuildings(offX){
+  const B=[
+    {l:0,  w:48, h:90},  {l:55, w:30, h:55},
+    {l:92, w:70, h:130}, {l:170,w:40, h:70},
+    {l:218,w:55, h:110}, {l:280,w:35, h:60},
+    {l:322,w:80, h:140}, {l:410,w:45, h:80},
+    {l:462,w:60, h:100}, {l:530,w:38, h:65},
+    {l:575,w:85, h:120}, {l:668,w:50, h:90},
+    {l:726,w:70, h:140},
+  ];
+  B.forEach(b=>{
+    const bx=((offX*0.3+b.l)%(GW+200)+GW+200)%(GW+200)-100;
+    const by=GND-b.h;
+    gx.fillStyle='#0b1030'; gx.fillRect(bx,by,b.w,b.h);
+    for(let wy=by+6;wy<GND-6;wy+=12){
+      for(let wx=bx+5;wx<bx+b.w-5;wx+=12){
+        const h=Math.sin(wx*3.7+wy*1.3)*0.5+0.5;
+        if(h>0.35){ gx.fillStyle=h>0.7?'rgba(255,230,0,0.35)':'rgba(0,200,255,0.2)'; gx.fillRect(wx,wy,6,5); }
+      }
+    }
+  });
+}
+
+/* ── BUTTONS ── */
+document.getElementById('btn-retry').addEventListener('click',()=>{
+  showScreen('game');
+  Aud.playGame();
+  startGame();
+});
+document.getElementById('btn-tomenu').addEventListener('click',()=>{
+  showScreen('menu');
+  if(raf) cancelAnimationFrame(raf);
+  btnJ.disabled=false;
+  Aud.playMenu();
+  startMenuAnim();
+});
+</script>
+</body>
+</html>
