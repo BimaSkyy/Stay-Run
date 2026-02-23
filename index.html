@@ -383,101 +383,62 @@ function showScreen(id) {
 }
 
 /* ============================================================
-   AUDIO
+   AUDIO  — file list diinject langsung dari Flask (works di Vercel)
    ============================================================ */
-const Aud = {
-  tracks: [],      // semua track
-  menuTrack: null, // 'menu.mp3' kalau ada
-  gameTracks: [],  // semua selain menu.mp3
-  idx: 0,
-  el: null,
+const Aud = (() => {
+  const allTracks  = {{ music_files | safe }};  // e.g. ["menu.mp3","bgm1.mp3"]
+  const menuTrack  = allTracks.find(f => f.toLowerCase() === 'menu.mp3') || allTracks[0] || null;
+  const gameTracks = allTracks.filter(f => f.toLowerCase() !== 'menu.mp3');
+  const GT         = gameTracks.length ? gameTracks : allTracks; // fallback
 
-  async init(){
-    try {
-      const r = await fetch('/api/music-list');
-      const d = await r.json();
-      this.tracks = d.files || [];
-      // Pisahkan menu.mp3 dari game tracks
-      this.menuTrack = this.tracks.find(f => f.toLowerCase() === 'menu.mp3') || null;
-      this.gameTracks = this.tracks.filter(f => f.toLowerCase() !== 'menu.mp3');
-      // Kalau ga ada game tracks, pakai semua track termasuk menu
-      if(!this.gameTracks.length) this.gameTracks = [...this.tracks];
-    } catch(e) {}
-  },
+  let el  = null;
+  let idx = 0;
 
-  _play(file, loop){
+  function _play(file, loop){
     if(!file) return;
-    if(this.el){ this.el.pause(); this.el.onended = null; }
-    this.el = new Audio('/music/' + file);
-    this.el.volume = 0.3;
-    this.el.loop = loop || false;
-    this.el.play().catch(()=>{});
+    if(el){ el.pause(); el.onended = null; }
+    el = new Audio('/static/music/' + file);
+    el.volume = 0.32;
+    el.loop   = !!loop;
+    el.play().catch(()=>{});
     if(!loop){
-      this.el.onended = () => {
-        this.idx = (this.idx + 1) % this.gameTracks.length;
-        this._play(this.gameTracks[this.idx], false);
-      };
+      el.onended = () => { idx = (idx + 1) % GT.length; _play(GT[idx], false); };
     }
-  },
+  }
 
-  playMenu(){
-    if(!this.tracks.length) return;
-    // Kalau ada menu.mp3 pakai itu, kalau ga pakai track pertama
-    const track = this.menuTrack || this.tracks[0];
-    this._play(track, true); // loop menu music
-  },
-
-  playGame(){
-    if(!this.gameTracks.length) return;
-    this.idx = 0;
-    this._play(this.gameTracks[0], false);
-  },
-
-  stop(){ if(this.el){ this.el.pause(); this.el.onended = null; } }
-};
-Aud.init();
+  return {
+    playMenu(){ _play(menuTrack, true); },
+    playGame(){ idx = 0; _play(GT[0], false); },
+    stop(){ if(el){ el.pause(); el.onended = null; } }
+  };
+})();
 
 /* ============================================================
-   PHOTO BACKGROUNDS
+   PHOTO BACKGROUNDS — file list diinject dari Flask (works di Vercel)
    ============================================================ */
-const Photos = {
-  imgs: [], loaded: false,
+const Photos = (() => {
+  const files = {{ photo_files | safe }};  // e.g. ["city.jpg","forest.jpg"]
+  const imgs  = [];
+  let loaded  = false;
 
-  async init(){
-    try {
-      const r = await fetch('/api/photo-list');
-      const d = await r.json();
-      const files = d.files || [];
-      if(!files.length) return;
-
-      let done = 0;
-      const total = files.length;
-      const tempImgs = new Array(total);
-
-      files.forEach((f, i) => {
-        const img = new Image();
-        img.onload = () => {
-          tempImgs[i] = img;
-          done++;
-          if(done === total){
-            // filter out failed ones, keep order
-            this.imgs = tempImgs.filter(Boolean);
-            if(this.imgs.length) this.loaded = true;
-          }
-        };
-        img.onerror = () => {
-          done++;
-          if(done === total){
-            this.imgs = tempImgs.filter(Boolean);
-            if(this.imgs.length) this.loaded = true;
-          }
-        };
-        img.src = '/photos/' + f;
-      });
-    } catch(e){ console.warn('Photo load error:', e); }
+  if(files.length){
+    let done = 0;
+    const tmp = new Array(files.length);
+    files.forEach((f, i) => {
+      const img = new Image();
+      img.onload = img.onerror = function(){
+        if(img.naturalWidth) tmp[i] = img;
+        if(++done === files.length){
+          imgs.push(...tmp.filter(Boolean));
+          if(imgs.length) loaded = true;
+        }
+      };
+      img.src = '/static/photos/' + f;
+    });
   }
-};
-Photos.init();
+
+  return { get imgs(){ return imgs; }, get loaded(){ return loaded; } };
+})();
 
 /* ============================================================
    INTRO
