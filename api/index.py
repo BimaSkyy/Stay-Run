@@ -1,6 +1,8 @@
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template
 import os, json
 
+# Di Vercel, file ada di /var/task/api/index.py
+# BASE = folder root project (satu level di atas api/)
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 app = Flask(__name__,
@@ -16,7 +18,8 @@ def scan(subfolder, exts):
                    if os.path.splitext(f)[1].lower() in exts])
 
 @app.route('/')
-def index():
+@app.route('/<path:path>')
+def index(path=''):
     music  = scan('music',  {'.mp3', '.ogg', '.wav'})
     photos = scan('photos', {'.jpg', '.jpeg', '.png', '.webp'})
     return render_template('index.html',
